@@ -42,21 +42,21 @@ def maxpool3d(x):
 # This is the network graph
 def convolutional_neural_network(x):
     # manually calculate the number of feature maps before the dense layer
-    nfm = np.int32(np.ceil(IMG_DIM1/2/2)*np.ceil(IMG_DIM2/2/2)*np.ceil(SLICE_COUNT/2/2)*4)
+    nfm = np.int32(np.ceil(IMG_DIM1/2/2)*np.ceil(IMG_DIM2/2/2)*np.ceil(SLICE_COUNT/2/2)*64)
     
     # Initialize weights with a small positive random noise (to avoid "dead" neurons due to ReLU ignoring negative)
     #                # 5 x 5 x 5 patches, 1 channel, 32 features to compute.
-    weights = {'W_conv1':tf.Variable(tf.truncated_normal([5,5,5,1,2],stddev=0.1)),
+    weights = {'W_conv1':tf.Variable(tf.truncated_normal([5,5,5,1,32],stddev=0.1)),
                #       5 x 5 x 5 patches, 32 channels, 64 features to compute.
-               'W_conv2':tf.Variable(tf.truncated_normal([5,5,5,2,4],stddev=0.1)),
+               'W_conv2':tf.Variable(tf.truncated_normal([5,5,5,2,64],stddev=0.1)),
                #                       nfm fully connected   1024 features
-               'W_fc':tf.Variable(tf.truncated_normal([nfm,64],stddev=0.1)),
-               'out':tf.Variable(tf.truncated_normal([64, n_classes],stddev=0.1))}
+               'W_fc':tf.Variable(tf.truncated_normal([nfm,1024],stddev=0.1)),
+               'out':tf.Variable(tf.truncated_normal([1024, n_classes],stddev=0.1))}
 
     # Sentdex used tf.random_normal to initialize biases, but MNIST TF tutorial just defines them with tf.constant
-    biases = {'b_conv1':tf.Variable(tf.random_normal([2])),
-               'b_conv2':tf.Variable(tf.random_normal([4])),
-               'b_fc':tf.Variable(tf.random_normal([64])),
+    biases = {'b_conv1':tf.Variable(tf.random_normal([32])),
+               'b_conv2':tf.Variable(tf.random_normal([64])),
+               'b_fc':tf.Variable(tf.random_normal([1024])),
                'out':tf.Variable(tf.random_normal([n_classes]))}
 
     #                            image X   image Y      image Z   last dim corresponds to # of color chan
