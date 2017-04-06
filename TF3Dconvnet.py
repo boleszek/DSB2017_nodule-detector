@@ -19,15 +19,15 @@ batch_size = 10
 x = tf.placeholder('float')
 y = tf.placeholder('float')
 
-keep_rate = 0.8
+keep_rate = 0.8 # for dropout (not used)
 
+# data folder
 dfold = '3Darrays_stage1'
 
-# load training image names and labels into data frame (no validation)
+
+# load training names and labels (no validation)
 Y_df = pd.read_csv('stage1_labels.csv', index_col=0)
 train_data = [name +'.npy' for name in Y_df.index]
-test_df = pd.read_csv('stage1_sample_submission.csv', index_col=0)
-test_data = [name +'.npy' for name in test_df.index]
 
 
 #============== Define Subfunctions ================#
@@ -104,9 +104,11 @@ def train_neural_network(x):
     cost = tf.reduce_mean( tf.nn.softmax_cross_entropy_with_logits(logits=prediction,labels=y) )
     optimizer = tf.train.AdamOptimizer(learning_rate=1e-3).minimize(cost)
     
+    saver = tf.train.Saver()
+    
     hm_epochs = 5
     with tf.Session() as sess:
-        sess.run(tf.initialize_all_variables())
+        sess.run(tf.global_variables_initializer())
         
         successful_runs = 0
         total_runs = 0
@@ -116,29 +118,26 @@ def train_neural_network(x):
             for data in train_data:
                 total_runs += 1
                 try:
-                    print('loading '+ data)
                     X = np.load(dfold+'/'+data)
                     X = normalize(X)
                     X = zero_center(X)
                     Y = one_hot(Y_df.get_value(data[:-4],'cancer'))
                     _, c = sess.run([optimizer, cost], feed_dict={x: X, y: Y})
-                    #print('optimizer finished')
                     epoch_loss += c
+                    print('Epoch ', epoch+1, ' | ',data,' completed ','loss:',epoch_loss)
                     successful_runs += 1
                 except Exception as e:
                     # I am passing for the sake of notebook space, but we are getting 1 shaping issue from one 
                     # input tensor. Not sure why, will have to look into it. Guessing it's
                     # one of the depths that doesn't come to 20.
-                    #print(str(e))
+                    print('error')
                     #print('epoch '+ epoch + ' ' + data)
                     pass
             
-            print('Epoch', epoch+1, 'completed out of',hm_epochs,'loss:',epoch_loss)
+            print('Epoch', epoch+1, 'completed out of',hm_epochs,'cum loss:',epoch_loss)
 
             correct = tf.equal(tf.argmax(prediction, 1), tf.argmax(y, 1))
             accuracy = tf.reduce_mean(tf.cast(correct, 'float'))
-            
-            # Skip accuracy evals to save on time
 
             #print('Accuracy:',accuracy.eval({x:[np.load(dfold+'/'+i) for i in val_data], y:[one_hot(Y_df.get_value(data[:-4],'cancer')) for i in val_data]}))
             #print('Accuracy:',accuracy.eval({x:[np.load(dfold+'/'+i) for i in test_data], y:[one_hot(test_df.get_value(data[:-4],'cancer')) for i in test_data]}))
@@ -149,13 +148,16 @@ def train_neural_network(x):
         
         print('Percent files used:',successful_runs/total_runs)
         
-        # Finally, run the model on the test data
-        test_predictions = [sess.run(prediction, feed_dict={x:[np.load(dfold+'/'+i)]}) for i in test_data]
+        save_path = saver.save(sess, "Stage1Model.ckpt")
+        print("Model saved in file: %s" % save_path)
         
-    return test_predictions
+        # Finally, run the model on the test data
+        #test_predictions = [sess.run(prediction, feed_dict={x:[np.load(dfold+'/'+i)]}) for i in test_data]
+        
+    return prediction
         
         
 #=========== Run Locally =============#
-trainp,testp=train_neural_network(x)
+trainp=train_neural_network(x)
 np.save('train_predictions.npy',trainp)
-np.save('test_predictions.npy',testp)
+
