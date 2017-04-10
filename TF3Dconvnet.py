@@ -2,11 +2,16 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 import os
+import pickle
 
 # Initialize variables
 IMG_DIM1 = 100
 IMG_DIM2 = 120
 SLICE_COUNT = 60
+
+feat1 = 16
+feat2 = 40
+feat3 = 300
 
 MIN_BOUND = -1000.0 # for image normalization
 MAX_BOUND = 400.0
@@ -14,7 +19,7 @@ MAX_BOUND = 400.0
 PIXEL_MEAN = 0.25 # use the mean of the ENTIRE DATA SET!
 
 n_classes = 2
-batch_size = 10
+batch_size = 50
 
 x = tf.placeholder('float')
 y = tf.placeholder('float')
@@ -42,21 +47,21 @@ def maxpool3d(x):
 # This is the network graph
 def convolutional_neural_network(x):
     # manually calculate the number of feature maps before the dense layer
-    nfm = np.int32(np.ceil(IMG_DIM1/2/2)*np.ceil(IMG_DIM2/2/2)*np.ceil(SLICE_COUNT/2/2)*64)
+    nfm = np.int32(np.ceil(IMG_DIM1/2/2)*np.ceil(IMG_DIM2/2/2)*np.ceil(SLICE_COUNT/2/2)*feat2)
     
     # Initialize weights with a small positive random noise (to avoid "dead" neurons due to ReLU ignoring negative)
     #                # 5 x 5 x 5 patches, 1 channel, 32 features to compute.
-    weights = {'W_conv1':tf.Variable(tf.truncated_normal([5,5,5,1,32],stddev=0.1)),
+    weights = {'W_conv1':tf.Variable(tf.truncated_normal([5,5,5,1,feat1],stddev=0.1)),
                #       5 x 5 x 5 patches, 32 channels, 64 features to compute.
-               'W_conv2':tf.Variable(tf.truncated_normal([5,5,5,2,64],stddev=0.1)),
+               'W_conv2':tf.Variable(tf.truncated_normal([5,5,5,feat1,feat2],stddev=0.1)),
                #                       nfm fully connected   1024 features
-               'W_fc':tf.Variable(tf.truncated_normal([nfm,1024],stddev=0.1)),
-               'out':tf.Variable(tf.truncated_normal([1024, n_classes],stddev=0.1))}
+               'W_fc':tf.Variable(tf.truncated_normal([nfm,feat3],stddev=0.1)),
+               'out':tf.Variable(tf.truncated_normal([feat3, n_classes],stddev=0.1))}
 
     # Sentdex used tf.random_normal to initialize biases, but MNIST TF tutorial just defines them with tf.constant
-    biases = {'b_conv1':tf.Variable(tf.random_normal([32])),
-               'b_conv2':tf.Variable(tf.random_normal([64])),
-               'b_fc':tf.Variable(tf.random_normal([1024])),
+    biases = {'b_conv1':tf.Variable(tf.random_normal([feat1])),
+               'b_conv2':tf.Variable(tf.random_normal([feat2])),
+               'b_fc':tf.Variable(tf.random_normal([feat3])),
                'out':tf.Variable(tf.random_normal([n_classes]))}
 
     #                            image X   image Y      image Z   last dim corresponds to # of color chan
@@ -106,7 +111,7 @@ def train_neural_network(x):
     
     saver = tf.train.Saver()
     
-    hm_epochs = 5
+    hm_epochs = np.int32(np.floor(len(train_data)/batch_size))
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
         
@@ -115,7 +120,9 @@ def train_neural_network(x):
         
         for epoch in range(hm_epochs):
             epoch_loss = 0
-            for data in train_data:
+            # manually run through batches
+            train_data_batch = train_data[epoch*batch_size:(epoch*batch_size+batch_size)]
+            for data in train_data_batch:
                 total_runs += 1
                 try:
                     X = np.load(dfold+'/'+data)
@@ -148,7 +155,7 @@ def train_neural_network(x):
         
         print('Percent files used:',successful_runs/total_runs)
         
-        save_path = saver.save(sess, "Stage1Model.ckpt")
+        save_path = saver.save(sess, "Stage2Model2.ckpt")
         print("Model saved in file: %s" % save_path)
         
         # Finally, run the model on the test data
@@ -159,5 +166,7 @@ def train_neural_network(x):
         
 #=========== Run Locally =============#
 trainp=train_neural_network(x)
-np.save('train_predictions.npy',trainp)
+#trainplist=[]
+#trainplist.append(trainp)
 
+#pickle.dump( trainplist, open( "train_predictions_stage2.p", "wb" ) )
